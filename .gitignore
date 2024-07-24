@@ -1,0 +1,10 @@
+
+/node_modules
+/.idea
+/venv
+/terraform/.terraform
+/lambda/node_modules
+lambda/bot.log
+/lambda/mt5-utils/node_modules
+/lambda/set-webhook-for-telegram-bot/node_modules
+/lambda/mt5-utils/coverage

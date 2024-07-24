@@ -1,0 +1,16 @@
+{
+  "name": "set-webhook-for-telegram-bot",
+  "version": "1.0.0",
+  "description": "Set webhook for telegram",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "winston": "^3.13.1"
+  }
+}
