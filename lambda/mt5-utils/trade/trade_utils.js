@@ -102,10 +102,43 @@ function parseProvider1(lines) {
 }
 
 function parseProvider2(lines) {
-  // Implement similar logic for another provider
-  // This function can have a different format parsing logic
-  // Return null if parsing fails
-  return null;
+  const trade = {};
+
+  // Determine the order type and symbol
+  const firstLine = lines[0].toUpperCase();
+  if (firstLine.includes('LONG')) {
+    trade.orderType = 'Buy';
+  } else if (firstLine.includes('SHORT')) {
+    trade.orderType = 'Sell';
+  } else {
+    return null;
+  }
+
+  // Extract symbol
+  const symbolMatch = firstLine.match(/[A-Z]{6}/);
+  if (!symbolMatch) return null;
+  trade.symbol = symbolMatch[0];
+  if (!config.ALLOWED_SYMBOLS.includes(trade.symbol.toUpperCase())) return null;
+
+  // Extract entry price
+  const entryLine = lines[1];
+  const entryMatch = entryLine.match(/Open Price:\s*([\d.]+)/);
+  if (!entryMatch) return null;
+  trade.entry = parseFloat(entryMatch[1]);
+
+  // Extract stop loss value
+  const slLine = lines[2];
+  const slMatch = slLine.match(/SL:\s*([\d.]+)/);
+  if (!slMatch) return null;
+  trade.stopLoss = parseFloat(slMatch[1]);
+
+  // Extract take profit value (1:1 Risk:Reward TP)
+  const tpLine = lines[4]; // 5th line contains the 1:1 Risk:Reward TP
+  const tpMatch = tpLine.match(/1:1 Risk:Reward TP:\s*([\d.]+)/);
+  if (!tpMatch) return null;
+  trade.takeProfits = [parseFloat(tpMatch[1])];
+
+  return trade;
 }
 
 function getIsoDateStr(date) {

@@ -18,11 +18,6 @@ async function handleMessage(message) {
   const username = message.from.username;
   const text = message.text;
 
-  if (username !== config.AUTHORIZED_TELEGRAM_USER) {
-    await sendMessage(chatId, "You are not authorized to use this bot!");
-    return;
-  }
-
   if (text.startsWith('/')) {
     await sendMessage(chatId, "Invalid command!");
     return;
@@ -157,7 +152,7 @@ async function handleTradeLast(message) {
     await saveChatMessageIfNotDuplicate(message);
     const lastMessages = await getLastMessages(username);
     const lastTradeSignal = lastMessages.find(
-        (msg) => msg.message.includes('BUY') || msg.message.includes('SELL')
+        (msg) => msg.message.includes('BUY') || msg.message.includes('SELL')  || msg.message.includes('Long')  || msg.message.includes('Short')
     );
 
     if (lastTradeSignal) {
@@ -197,7 +192,7 @@ async function handleCalculateLast(message) {
 
 async function handleCalculateLastFromMessages(lastMessages, chatId) {
   const lastTradeSignal = lastMessages.find(
-      (msg) => msg.message.includes('BUY') || msg.message.includes('SELL')
+      (msg) => msg.message.includes('BUY') || msg.message.includes('SELL')  || msg.message.includes('Long')  || msg.message.includes('Short')
   );
 
   if (lastTradeSignal) {
