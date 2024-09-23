@@ -20,10 +20,14 @@ const PLACE_TRADE_MESSAGE = `🚀 Please enter the trade you would like to place
 
 💼 **Optional Risk Control**:
 🔒 **Max Risk**: \`MaxRisk\` (Specify the maximum amount to risk for this trade)
-📏 **Lot Size**: \`LotSize\` (Specify the maximum lot size for the trade)
+📏 **Lot Size**: \`LotSize\` (Specify the lot size for the trade)
+
+🆔 **Signal Source**:
+📝 **Source**: \`SourceName\`
 
 Example:
 \`\`\`
+Source: 1000pipBuilder
 BUY EURUSD @ 1.1200
 TP1: 1.1250
 TP2: 1.1300
@@ -37,6 +41,7 @@ LotSize: 0.5
 - Use the optional \`MaxRisk\` field to limit your risk on the trade.
 - Use the optional \`LotSize\` field to specify the exact lot size you want to trade.
 - If no \`MaxRisk\` or \`LotSize\` is provided, default settings will be applied.
+- **Source** is required to identify the signal provider.
 `;
 
 async function handleMessage(message) {

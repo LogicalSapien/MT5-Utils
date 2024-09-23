@@ -13,27 +13,20 @@ function parseTradeSignal(signal, signalDateStr) {
   let trade = null;
   let signalSource = null;
 
-  function extractSource(line) {
-    const sourceMatch = line.match(/Source:\s*(\w+)/i);
-    return sourceMatch ? sourceMatch[1] : null;
-  }
-
-  // Check the first line and the last line for source
-  signalSource = extractSource(lines[0]);
-  if (signalSource) {
-    lines.shift(); // Remove the first line if it contains the source
-  } else {
-    signalSource = extractSource(lines[lines.length - 1]);
-    if (signalSource) {
-      lines.pop(); // Remove the last line if it contains the source
+  // Extract Source from the signal
+  const sourceLine = lines.find(line => line.toUpperCase().startsWith('SOURCE:'));
+  if (sourceLine) {
+    const sourceMatch = sourceLine.match(/Source:\s*(.+)/i);
+    if (sourceMatch && sourceMatch[1]) {
+      signalSource = sourceMatch[1];
     }
   }
 
-  // Define provider-specific parsers with their corresponding signal source names
+  // Define provider-specific parsers
   const parsers = [
     { parser: parseProvider1, source: signalProviders[0] || 'Unknown' },
-    { parser: parseProvider2, source: signalProviders[1] || 'Unknown' }
-    // Add more providers as needed
+    { parser: parseProvider2, source: signalProviders[1] || 'Unknown' },
+    { parser: parseProvider3, source: signalProviders[2] || 'Unknown' }
   ];
 
   // Try parsing with each provider-specific parser
@@ -53,20 +46,77 @@ function parseTradeSignal(signal, signalDateStr) {
     // Optionally parse maxRisk or lotSize from the signal text
     const maxRiskLine = lines.find(line => line.toUpperCase().startsWith('MAXRISK:'));
     if (maxRiskLine) {
-      const maxRiskMatch = maxRiskLine.match(/MAXRISK:\s*([\d.]+)/i);
-      if (maxRiskMatch) {
+      const maxRiskMatch = maxRiskLine.match(/MaxRisk:\s*([\d.]+)/i);
+      if (maxRiskMatch && maxRiskMatch[1]) {
         trade.maxRisk = parseFloat(maxRiskMatch[1]);
       }
     }
 
     const lotSizeLine = lines.find(line => line.toUpperCase().startsWith('LOTSIZE:'));
     if (lotSizeLine) {
-      const lotSizeMatch = lotSizeLine.match(/LOTSIZE:\s*([\d.]+)/i);
-      if (lotSizeMatch) {
+      const lotSizeMatch = lotSizeLine.match(/LotSize:\s*([\d.]+)/i);
+      if (lotSizeMatch && lotSizeMatch[1]) {
         trade.lotSize = parseFloat(lotSizeMatch[1]);
       }
     }
   }
+
+  return trade;
+}
+
+/**
+ * Parser for the  format:
+ * BUY/SELL SYMBOL @ EntryPrice
+ * TP1: TakeProfit1
+ * TP2: TakeProfit2
+ * TP3: TakeProfit3
+ * SL: StopLoss
+ * MaxRisk: MaximumRiskAmount (Optional)
+ * LotSize: LotSizeValue (Optional)
+ */
+function parseProvider3(lines) {
+  const trade = {};
+
+  // Determine the order type and symbol
+  const firstLine = lines[1].toUpperCase(); // Start parsing from the second line (ignoring 'Source' line)
+  if (firstLine.includes('BUY')) {
+    trade.orderType = 'Buy';
+  } else if (firstLine.includes('SELL')) {
+    trade.orderType = 'Sell';
+  } else {
+    return null;
+  }
+
+  // Extract symbol
+  const symbolMatch = firstLine.match(/[A-Z]{6}/);
+  if (!symbolMatch) return null;
+  trade.symbol = symbolMatch[0];
+  if (!config.ALLOWED_SYMBOLS.includes(trade.symbol.toUpperCase())) return null;
+
+  // Extract entry price
+  const entryMatch = firstLine.match(/@[\s]*([\d.]+)/);
+  if (entryMatch) {
+    trade.entry = parseFloat(entryMatch[1]);
+  } else {
+    trade.entry = 'NOW'; // Default if not specified
+  }
+
+  // Extract take profit and stop loss values
+  trade.takeProfits = [];
+  for (let i = 2; i < lines.length; i++) {
+    const upperLine = lines[i].toUpperCase();
+    if (upperLine.includes('TP')) {
+      const tpValue = parseFloat(lines[i].split(':')[1].trim());
+      if (isNaN(tpValue)) return null;
+      trade.takeProfits.push(tpValue);
+    } else if (upperLine.includes('SL')) {
+      const slValue = parseFloat(lines[i].split(':')[1].trim());
+      if (isNaN(slValue)) return null;
+      trade.stopLoss = slValue;
+    }
+  }
+
+  if (!trade.takeProfits.length || isNaN(trade.stopLoss)) return null;
 
   return trade;
 }
@@ -179,9 +229,15 @@ function parseProvider2(lines) {
   return trade;
 }
 
+/**
+ * Converts a Unix timestamp to ISO Date string.
+ * @param {number} date - Unix timestamp in seconds.
+ * @returns {string} - ISO formatted date string.
+ */
 function getIsoDateStr(date) {
   const dateInMillis = new Date(date * 1000); // Multiply by 1000 to convert seconds to milliseconds
   return dateInMillis.toISOString();
 }
 
 module.exports = { parseTradeSignal, getIsoDateStr };
+
