@@ -11,7 +11,7 @@ module.exports = {
   MIN_POSITION_SIZE: process.env.MIN_POSITION_SIZE || 0.1,
   ROUND_POSITION_SIZE: process.env.ROUND_POSITION_SIZE || true, // Set this to true if you want to round the position size
   ROUND_POSITION_SIZE_FACTOR: process.env.ROUND_POSITION_SIZE_FACTOR || 0.1, // Set the rounding factor (e.g., 0.1, 1, etc.),
-  MAX_POSITION_SIZE: process.env.MAX_POSITION_SIZE || 0.2, // The maximum position size allowed
+  MAX_POSITION_SIZE: process.env.MAX_POSITION_SIZE || 1, // The maximum position size allowed
   CURRENCY_NAME: process.env.CURRENCY_NAME || 'GBP',
   CURRENCY_SYMBOL: process.env.CURRENCY_SYMBOL || '£',
   ENABLE_TRADE_EXECUTION: process.env.ENABLE_TRADE_EXECUTION || false, // New flag to enable or disable trade execution

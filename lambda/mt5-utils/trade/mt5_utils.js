@@ -157,13 +157,34 @@ async function calculateTradeParameters(trade, connection, balance) {
 
   const totalRiskAmount = balance * trade.riskFactor; // Total risk in account currency (e.g., £10 for £1000 balance)
 
-  // Calculate position size per TP
+  // **Define risk proportions per TP**
+  const lastTpRiskProportion = 0.5; // Last TP gets 50% of total risk
+  const remainingRiskProportion = 1 - lastTpRiskProportion;
+  const numOtherTPs = trade.takeProfits.length - 1;
+
+  const riskProportions = [];
+
+  if (numOtherTPs > 0) {
+    const riskPerOtherTP = remainingRiskProportion / numOtherTPs; // Equally distribute the remaining risk among the other TPs
+    for (let i = 0; i < trade.takeProfits.length; i++) {
+      if (i === trade.takeProfits.length - 1) {
+        riskProportions[i] = lastTpRiskProportion; // Last TP gets 50%
+      } else {
+        riskProportions[i] = riskPerOtherTP; // Other TPs get equal portions of the remaining 50%
+      }
+    }
+  } else {
+    // Only one TP
+    riskProportions[0] = 1;
+  }
+
+  // **Calculate position size per TP**
   const positionSizePerTP = [];
   let totalPositionSize = 0;
   const potentialLossPerTP = [];
 
   for (let i = 0; i < trade.takeProfits.length; i++) {
-    const riskPerTP = totalRiskAmount;  // Since you want to risk exactly 1%, use the total risk amount
+    const riskPerTP = totalRiskAmount * riskProportions[i];  // Risk allocated to this TP
     let positionSize = riskPerTP / (stopLossPips * config.PIP_VALUE);  // Adjust position size based on risk
 
     // Apply rounding and limits
