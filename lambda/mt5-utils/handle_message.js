@@ -5,12 +5,39 @@ const { sendMessage } = require('./telegram/telegram_utils');
 const logger = require('./logger');
 const config = require('./config');
 
-const PLACE_TRADE_MESSAGE = `Please enter the trade you would like to place in the following format:\n\n
-📈 BUY/SELL SYMBOL @ EntryPrice\n
-✅ TP1: TakeProfit1 ✅\n
-✅ TP2: TakeProfit2 ✅\n
-✅ TP3: TakeProfit3 ✅\n
-❌ SL: StopLoss ❌`;
+const PLACE_TRADE_MESSAGE = `🚀 Please enter the trade you would like to place in the following format:
+
+📊 **Trade Type**: \`BUY/SELL\` 
+🔢 **Symbol**: \`SYMBOL\`
+💰 **Entry Price**: \`@ EntryPrice\`
+
+🎯 **Take Profit Levels**:
+✅ **TP1**: \`TakeProfit1\`
+✅ **TP2**: \`TakeProfit2\`
+✅ **TP3**: \`TakeProfit3\`
+
+🔻 **Stop Loss**: \`SL: StopLoss\`
+
+💼 **Optional Risk Control**:
+🔒 **Max Risk**: \`MaxRisk\` (Specify the maximum amount to risk for this trade)
+📏 **Lot Size**: \`LotSize\` (Specify the maximum lot size for the trade)
+
+Example:
+\`\`\`
+BUY EURUSD @ 1.1200
+TP1: 1.1250
+TP2: 1.1300
+TP3: 1.1350
+SL: 1.1150
+MaxRisk: 20
+LotSize: 0.5
+\`\`\`
+
+📌 **Notes**:
+- Use the optional \`MaxRisk\` field to limit your risk on the trade.
+- Use the optional \`LotSize\` field to specify the exact lot size you want to trade.
+- If no \`MaxRisk\` or \`LotSize\` is provided, default settings will be applied.
+`;
 
 async function handleMessage(message) {
   logger.info('handleMessage');
@@ -64,6 +91,7 @@ async function handleNewSignal(chatId, text, signalDate, messageId) {
   const trade = parseTradeSignal(text, getIsoDateStr(signalDate));
   if (!trade) {
     await sendMessage(chatId, "Invalid trade format. Please use the correct format.");
+    await sendMessage(chatId, PLACE_TRADE_MESSAGE);
     return;
   }
   // Automatically perform the calculation
@@ -172,10 +200,12 @@ async function handleTradeLast(message) {
           await markTradeExecuted(lastTradeSignal.messageId);
         } else {
           await sendMessage(message.chat.id, "Invalid trade format in the last signal.");
+          await sendMessage(message.chat.id, PLACE_TRADE_MESSAGE);
         }
       }
     } else {
       await sendMessage(message.chat.id, "No trade signal found. Please send a new trade signal.");
+      await sendMessage(message.chat.id, PLACE_TRADE_MESSAGE);
     }
   } catch (error) {
     logger.error('Error fetching previous state:', error);

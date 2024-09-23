@@ -155,37 +155,44 @@ async function calculateTradeParameters(trade, connection, balance) {
       (trade.stopLoss - trade.currentEntry) / (trade.symbol.includes('JPY') ? 0.01 : 0.0001)
   );
 
-  const totalRiskAmount = balance * trade.riskFactor; // Total risk in account currency (e.g., £10 for £1000 balance)
+  // Calculate total risk amount based on balance and riskFactor unless maxRisk is provided
+  const totalRiskAmount = trade.maxRisk ? trade.maxRisk : balance * trade.riskFactor;
 
-  // **Define risk proportions per TP**
-  const lastTpRiskProportion = 0.5; // Last TP gets 50% of total risk
+  // If a lotSize is specified, use it instead of calculating position size
+  const lastTpRiskProportion = 0.5;
   const remainingRiskProportion = 1 - lastTpRiskProportion;
   const numOtherTPs = trade.takeProfits.length - 1;
 
   const riskProportions = [];
 
   if (numOtherTPs > 0) {
-    const riskPerOtherTP = remainingRiskProportion / numOtherTPs; // Equally distribute the remaining risk among the other TPs
+    const riskPerOtherTP = remainingRiskProportion / numOtherTPs;
     for (let i = 0; i < trade.takeProfits.length; i++) {
       if (i === trade.takeProfits.length - 1) {
-        riskProportions[i] = lastTpRiskProportion; // Last TP gets 50%
+        riskProportions[i] = lastTpRiskProportion;
       } else {
-        riskProportions[i] = riskPerOtherTP; // Other TPs get equal portions of the remaining 50%
+        riskProportions[i] = riskPerOtherTP;
       }
     }
   } else {
-    // Only one TP
     riskProportions[0] = 1;
   }
 
-  // **Calculate position size per TP**
   const positionSizePerTP = [];
   let totalPositionSize = 0;
   const potentialLossPerTP = [];
 
   for (let i = 0; i < trade.takeProfits.length; i++) {
-    const riskPerTP = totalRiskAmount * riskProportions[i];  // Risk allocated to this TP
-    let positionSize = riskPerTP / (stopLossPips * config.PIP_VALUE);  // Adjust position size based on risk
+    const riskPerTP = totalRiskAmount * riskProportions[i];
+    let positionSize;
+
+    if (trade.lotSize) {
+      // Use specified lot size if provided
+      positionSize = trade.lotSize / trade.takeProfits.length;  // Equally distribute lot size across TPs
+    } else {
+      // Calculate position size based on risk
+      positionSize = riskPerTP / (stopLossPips * config.PIP_VALUE);
+    }
 
     // Apply rounding and limits
     if (config.ROUND_POSITION_SIZE) {
@@ -197,7 +204,7 @@ async function calculateTradeParameters(trade, connection, balance) {
       }
     }
 
-    positionSize = Math.min(positionSize, config.MAX_POSITION_SIZE);  // Ensure you don't exceed max position size
+    positionSize = Math.min(positionSize, config.MAX_POSITION_SIZE);
     positionSizePerTP[i] = positionSize;
     totalPositionSize += positionSize;
 
@@ -213,13 +220,11 @@ async function calculateTradeParameters(trade, connection, balance) {
   trade.potentialTotalLoss = potentialTotalLoss;
   trade.stopLossPips = stopLossPips;
 
-  // Calculate takeProfitPips
   const takeProfitPips = trade.takeProfits.map(tp => Math.abs(
       (tp - trade.currentEntry) / (trade.symbol.includes('JPY') ? 0.01 : 0.0001)
   ));
   trade.takeProfitPips = takeProfitPips;
 
-  // Calculate margin required for trade
   const marginInfo = await connection.calculateMargin({
     symbol: trade.symbol,
     type: trade.orderType === 'Buy' ? 'ORDER_TYPE_BUY' : 'ORDER_TYPE_SELL',

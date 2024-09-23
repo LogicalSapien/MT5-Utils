@@ -45,10 +45,27 @@ function parseTradeSignal(signal, signalDateStr) {
     }
   }
 
-  // Add signalReceivedTime and riskFactor if parsing was successful
+  // Add signalReceivedTime, riskFactor, maxRisk, and lotSize if provided
   if (trade) {
     trade.signalReceivedTime = signalDateStr;
     trade.riskFactor = parseFloat(config.RISK_FACTOR);
+
+    // Optionally parse maxRisk or lotSize from the signal text
+    const maxRiskLine = lines.find(line => line.toUpperCase().startsWith('MAXRISK:'));
+    if (maxRiskLine) {
+      const maxRiskMatch = maxRiskLine.match(/MAXRISK:\s*([\d.]+)/i);
+      if (maxRiskMatch) {
+        trade.maxRisk = parseFloat(maxRiskMatch[1]);
+      }
+    }
+
+    const lotSizeLine = lines.find(line => line.toUpperCase().startsWith('LOTSIZE:'));
+    if (lotSizeLine) {
+      const lotSizeMatch = lotSizeLine.match(/LOTSIZE:\s*([\d.]+)/i);
+      if (lotSizeMatch) {
+        trade.lotSize = parseFloat(lotSizeMatch[1]);
+      }
+    }
   }
 
   return trade;
