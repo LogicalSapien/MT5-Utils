@@ -155,37 +155,16 @@ async function calculateTradeParameters(trade, connection, balance) {
       (trade.stopLoss - trade.currentEntry) / (trade.symbol.includes('JPY') ? 0.01 : 0.0001)
   );
 
-  const totalRiskAmount = balance * trade.riskFactor;
+  const totalRiskAmount = balance * trade.riskFactor; // Total risk in account currency (e.g., £10 for £1000 balance)
 
-  // Define risk proportions per TP
-  const lastTpRiskProportion = 0.5; // Last TP gets 50% of total risk
-  const remainingRiskProportion = 1 - lastTpRiskProportion;
-  const numOtherTPs = trade.takeProfits.length - 1;
-
-  const riskProportions = [];
-
-  if (numOtherTPs > 0) {
-    const riskPerOtherTP = remainingRiskProportion / numOtherTPs;
-    for (let i = 0; i < trade.takeProfits.length; i++) {
-      if (i === trade.takeProfits.length - 1) {
-        riskProportions[i] = lastTpRiskProportion;
-      } else {
-        riskProportions[i] = riskPerOtherTP;
-      }
-    }
-  } else {
-    // Only one TP
-    riskProportions[0] = 1;
-  }
-
-  // Calculate position sizes per TP
+  // Calculate position size per TP
   const positionSizePerTP = [];
   let totalPositionSize = 0;
   const potentialLossPerTP = [];
 
   for (let i = 0; i < trade.takeProfits.length; i++) {
-    const riskPerTP = totalRiskAmount * riskProportions[i];
-    let positionSize = riskPerTP / (stopLossPips * config.PIP_VALUE);
+    const riskPerTP = totalRiskAmount;  // Since you want to risk exactly 1%, use the total risk amount
+    let positionSize = riskPerTP / (stopLossPips * config.PIP_VALUE);  // Adjust position size based on risk
 
     // Apply rounding and limits
     if (config.ROUND_POSITION_SIZE) {
@@ -197,7 +176,7 @@ async function calculateTradeParameters(trade, connection, balance) {
       }
     }
 
-    positionSize = Math.min(positionSize, config.MAX_POSITION_SIZE);
+    positionSize = Math.min(positionSize, config.MAX_POSITION_SIZE);  // Ensure you don't exceed max position size
     positionSizePerTP[i] = positionSize;
     totalPositionSize += positionSize;
 
