@@ -121,29 +121,45 @@ function parseProvider2(lines) {
   if (!config.ALLOWED_SYMBOLS.includes(trade.symbol.toUpperCase())) return null;
 
   // Extract entry price
-  const entryLine = lines[1];
-  const entryMatch = entryLine.match(/Open Price:\s*([\d.]+)/);
+  const entryLine = lines.find(line => line.toUpperCase().startsWith('OPEN PRICE:'));
+  if (!entryLine) return null;
+  const entryMatch = entryLine.match(/Open Price:\s*([\d.]+)/i);
   if (!entryMatch) return null;
   trade.entry = parseFloat(entryMatch[1]);
 
   // Extract stop loss value
-  const slLine = lines[2];
-  const slMatch = slLine.match(/SL:\s*([\d.]+)/);
+  const slLine = lines.find(line => line.toUpperCase().startsWith('SL:'));
+  if (!slLine) return null;
+  const slMatch = slLine.match(/SL:\s*([\d.]+)/i);
   if (!slMatch) return null;
   trade.stopLoss = parseFloat(slMatch[1]);
 
-  // Extract take profit value (1:1 Risk:Reward TP)
-  const tpLine = lines[4]; // 5th line contains the 1:1 Risk:Reward TP
-  const tpMatch = tpLine.match(/1:1 Risk:Reward TP:\s*([\d.]+)/);
-  if (!tpMatch) return null;
-  trade.takeProfits = [parseFloat(tpMatch[1])];
+  // Initialize takeProfits array
+  trade.takeProfits = [];
+
+  // Extract take profit values
+  lines.forEach(line => {
+    let tpMatch = null;
+
+    if (line.match(/Start Exit Zone TP:/i)) {
+      tpMatch = line.match(/Start Exit Zone TP:\s*([\d.]+)/i);
+    } else if (line.match(/1:1 Risk:Reward TP:/i)) {
+      tpMatch = line.match(/1:1 Risk:Reward TP:\s*([\d.]+)/i);
+    } else if (line.match(/End Exit Zone TP:/i)) {
+      tpMatch = line.match(/End Exit Zone TP:\s*([\d.]+)/i);
+    }
+
+    if (tpMatch) {
+      const tpValue = parseFloat(tpMatch[1]);
+      if (!isNaN(tpValue)) {
+        trade.takeProfits.push(tpValue);
+      }
+    }
+  });
+
+  if (!trade.takeProfits.length) return null;
 
   return trade;
-}
-
-function getIsoDateStr(date) {
-  const dateInMillis = new Date(date * 1000); // Multiply by 1000 to convert seconds to milliseconds
-  return dateInMillis.toISOString();
 }
 
 module.exports = { parseTradeSignal, getIsoDateStr };
