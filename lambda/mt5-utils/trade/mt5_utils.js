@@ -1,21 +1,18 @@
-const {sendMessage} = require('../telegram/telegram_utils');
+const { sendMessage } = require('../telegram/telegram_utils');
 const MetaApi = require('metaapi.cloud-sdk').default;
 const MetaStats = require('metaapi.cloud-sdk').MetaStats;
 const config = require('../config');
 const logger = require("../logger");
 
 async function getMetaTraderApiConnection(chatId, retries = 5, delay = 10000) {
-
   const api = new MetaApi(config.META_API_KEY);
-  const account = await api.metatraderAccountApi.getAccount(
-      config.META_ACCOUNT_ID);
+  const account = await api.metatraderAccountApi.getAccount(config.META_ACCOUNT_ID);
   await deployAccountIfNeeded(account);
 
   // Retry mechanism with exponential backoff
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      await sendMessage(chatId,
-          `Connecting to MetaTrader... Attempt ${attempt}...`);
+      await sendMessage(chatId, `Connecting to MetaTrader... Attempt ${attempt}...`);
       await account.waitConnected();
 
       const connection = account.getRPCConnection();
@@ -23,15 +20,13 @@ async function getMetaTraderApiConnection(chatId, retries = 5, delay = 10000) {
       await connection.waitSynchronized();
 
       await sendMessage(chatId, "Successfully connected to MetaTrader!");
-      return {connection, account};
+      return { connection, account };
     } catch (error) {
       if (attempt === retries) {
-        await sendMessage(chatId,
-            `Failed to connect after multiple attempts : ${error}`);
+        await sendMessage(chatId, `Failed to connect after multiple attempts : ${error}`);
         throw error;
       }
-      await sendMessage(chatId,
-          `Attempt ${attempt} failed. Retrying in ${delay / 1000} seconds...`);
+      await sendMessage(chatId, `Attempt ${attempt} failed. Retrying in ${delay / 1000} seconds...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       delay *= 2; // Exponential backoff
     }
@@ -118,14 +113,13 @@ async function handleMetaTraderTrade(chatId, trade, executeTrade, messageId) {
   let connection, account;
   try {
     logger.info('calling getMetaTraderApiConnection');
-    ({connection, account} = await getMetaTraderApiConnection(chatId));
+    ({ connection, account } = await getMetaTraderApiConnection(chatId));
     logger.info('calling getAccountInformation');
     const accountInfo = await connection.getAccountInformation();
     const balance = accountInfo.balance;
 
     logger.info('calling calculateTradeParameters');
-    const updatedTrade = await calculateTradeParameters(trade, connection,
-        balance);
+    const updatedTrade = await calculateTradeParameters(trade, connection, balance);
 
     await sendMessage(chatId, "Calculating trade risk...");
 
@@ -138,15 +132,13 @@ async function handleMetaTraderTrade(chatId, trade, executeTrade, messageId) {
         logger.info('calling placeTrade');
         await placeTrade(connection, updatedTrade, chatId, messageId);
       } else {
-        await sendMessage(chatId,
-            "Trade execution is currently disabled. No trades have been placed.");
+        await sendMessage(chatId, "Trade execution is currently disabled. No trades have been placed.");
       }
     }
 
   } catch (error) {
     console.error(`Error handling MetaTrader trade: ${error.message}`);
-    await sendMessage(chatId,
-        `There was an issue with the connection: ${error.message}`);
+    await sendMessage(chatId, `There was an issue with the connection: ${error.message}`);
   } finally {
     if (connection) {
       await connection.close();
@@ -157,36 +149,75 @@ async function handleMetaTraderTrade(chatId, trade, executeTrade, messageId) {
 async function calculateTradeParameters(trade, connection, balance) {
   trade.symbol += config.TRADE_SYMBOL_SUFFIX;
   const price = await connection.getSymbolPrice(trade.symbol);
-  trade.currentEntry = trade.orderType === 'Buy' ? parseFloat(price.bid)
-      : parseFloat(price.ask);
+  trade.currentEntry = trade.orderType === 'Buy' ? parseFloat(price.bid) : parseFloat(price.ask);
 
-  const stopLossPips = Math.abs(Math.round(
-      (trade.stopLoss - trade.currentEntry) / (trade.symbol.includes('JPY')
-          ? 0.01 : 0.0001)));
+  const stopLossPips = Math.abs(
+      (trade.stopLoss - trade.currentEntry) / (trade.symbol.includes('JPY') ? 0.01 : 0.0001)
+  );
 
   const totalRiskAmount = balance * trade.riskFactor;
-  const riskPerTP = totalRiskAmount / trade.takeProfits.length;
 
-  let positionSizePerTP = (riskPerTP / (stopLossPips * config.PIP_VALUE));
+  // Define risk proportions per TP
+  const lastTpRiskProportion = 0.5; // Last TP gets 50% of total risk
+  const remainingRiskProportion = 1 - lastTpRiskProportion;
+  const numOtherTPs = trade.takeProfits.length - 1;
 
-  if (config.ROUND_POSITION_SIZE) {
-    if (positionSizePerTP < config.MIN_POSITION_SIZE) {
-      positionSizePerTP = config.MIN_POSITION_SIZE;
-    } else {
-      const roundingFactor = config.MIN_POSITION_SIZE < 1 ? 0.1 : 1;
-      positionSizePerTP = Math.floor(positionSizePerTP / roundingFactor)
-          * roundingFactor;
+  const riskProportions = [];
+
+  if (numOtherTPs > 0) {
+    const riskPerOtherTP = remainingRiskProportion / numOtherTPs;
+    for (let i = 0; i < trade.takeProfits.length; i++) {
+      if (i === trade.takeProfits.length - 1) {
+        riskProportions[i] = lastTpRiskProportion;
+      } else {
+        riskProportions[i] = riskPerOtherTP;
+      }
     }
+  } else {
+    // Only one TP
+    riskProportions[0] = 1;
   }
 
-  positionSizePerTP = Math.min(positionSizePerTP, config.MAX_POSITION_SIZE);
-  trade.positionSizePerTP = positionSizePerTP;
-  trade.totalPositionSize = Math.round(
-      positionSizePerTP * trade.takeProfits.length * 100) / 100;
+  // Calculate position sizes per TP
+  const positionSizePerTP = [];
+  let totalPositionSize = 0;
+  const potentialLossPerTP = [];
 
-  const takeProfitPips = trade.takeProfits.map(tp => Math.abs(Math.round(
-      (tp - trade.currentEntry) / (trade.symbol.includes('JPY') ? 0.01
-          : 0.0001))));
+  for (let i = 0; i < trade.takeProfits.length; i++) {
+    const riskPerTP = totalRiskAmount * riskProportions[i];
+    let positionSize = riskPerTP / (stopLossPips * config.PIP_VALUE);
+
+    // Apply rounding and limits
+    if (config.ROUND_POSITION_SIZE) {
+      if (positionSize < config.MIN_POSITION_SIZE) {
+        positionSize = config.MIN_POSITION_SIZE;
+      } else {
+        const roundingFactor = config.MIN_POSITION_SIZE < 1 ? 0.1 : 1;
+        positionSize = Math.floor(positionSize / roundingFactor) * roundingFactor;
+      }
+    }
+
+    positionSize = Math.min(positionSize, config.MAX_POSITION_SIZE);
+    positionSizePerTP[i] = positionSize;
+    totalPositionSize += positionSize;
+
+    // Calculate potential loss per TP
+    potentialLossPerTP[i] = positionSize * config.PIP_VALUE * stopLossPips;
+  }
+
+  const potentialTotalLoss = potentialLossPerTP.reduce((a, b) => a + b, 0);
+
+  trade.positionSizePerTP = positionSizePerTP;
+  trade.potentialLossPerTP = potentialLossPerTP;
+  trade.totalPositionSize = Math.round(totalPositionSize * 100) / 100;
+  trade.potentialTotalLoss = potentialTotalLoss;
+  trade.stopLossPips = stopLossPips;
+
+  // Calculate takeProfitPips
+  const takeProfitPips = trade.takeProfits.map(tp => Math.abs(
+      (tp - trade.currentEntry) / (trade.symbol.includes('JPY') ? 0.01 : 0.0001)
+  ));
+  trade.takeProfitPips = takeProfitPips;
 
   // Calculate margin required for trade
   const marginInfo = await connection.calculateMargin({
@@ -195,18 +226,15 @@ async function calculateTradeParameters(trade, connection, balance) {
     volume: trade.totalPositionSize,
     openPrice: trade.currentEntry,
   });
+  trade.marginInfo = marginInfo;
 
-  return {...trade, stopLossPips, takeProfitPips, marginInfo};
+  return trade;
 }
 
 function createTradeInfoTable(trade, balance) {
-
-  const potentialLossPerTrade = trade.positionSizePerTP * config.PIP_VALUE
-      * trade.stopLossPips;
-  const potentialTotalLoss = potentialLossPerTrade * trade.takeProfits.length;
-
   let takeProfitsStr = trade.takeProfits.map(
-      (tp, index) => `TP${index + 1}: ${tp}`).join('\n');
+      (tp, index) => `TP${index + 1}: ${tp}`
+  ).join('\n');
 
   let table = `
 Signal Details
@@ -223,29 +251,31 @@ Trade Information
 Order Type: ${trade.orderType}
 Symbol: ${trade.symbol}
 Current Entry: ${trade.currentEntry}
-Stop Loss: ${trade.stopLossPips} pips
+Stop Loss: ${trade.stopLossPips.toFixed(2)} pips
 Risk Factor: ${(trade.riskFactor * 100).toFixed(2)}%
-Position Size per TP: ${trade.positionSizePerTP}
-Total Position Size: ${trade.totalPositionSize}
 Balance: ${config.CURRENCY_SYMBOL}${balance.toFixed(2)}
-Potential Loss per Trade: ${config.CURRENCY_SYMBOL}${potentialLossPerTrade.toFixed(
-      2)}
-Potential Total Loss: ${config.CURRENCY_SYMBOL}${potentialTotalLoss.toFixed(2)}
-Margin Required: ${config.CURRENCY_SYMBOL}${trade.marginInfo.margin.toFixed(
-      2)}\n`;
+Margin Required: ${config.CURRENCY_SYMBOL}${trade.marginInfo.margin.toFixed(2)}
+Total Position Size: ${trade.totalPositionSize}
 
-  let totalProfit = 0;
+Position Sizes and Potential Loss per TP:
+`;
+
   trade.takeProfits.forEach((tp, index) => {
-    const profitPips = trade.takeProfitPips[index];
-    const profitValue = trade.positionSizePerTP * config.PIP_VALUE * profitPips;
-    totalProfit += profitValue;
-    table += `TP${index
-    + 1}: ${profitPips} pips, Profit: ${config.CURRENCY_SYMBOL}${profitValue.toFixed(
-        2)}\n`;
+    table += `TP${index + 1}: Position Size: ${trade.positionSizePerTP[index]}, Potential Loss: ${config.CURRENCY_SYMBOL}${trade.potentialLossPerTP[index].toFixed(2)}\n`;
   });
 
-  table += `\nTotal Potential Profit: ${config.CURRENCY_SYMBOL}${totalProfit.toFixed(
-      2)}`;
+  table += `\nTotal Potential Loss: ${config.CURRENCY_SYMBOL}${trade.potentialTotalLoss.toFixed(2)}\n\n`;
+
+  let totalProfit = 0;
+  table += `Potential Profit per TP:\n`;
+  trade.takeProfits.forEach((tp, index) => {
+    const profitPips = trade.takeProfitPips[index];
+    const profitValue = trade.positionSizePerTP[index] * config.PIP_VALUE * profitPips;
+    totalProfit += profitValue;
+    table += `TP${index + 1}: ${profitPips.toFixed(2)} pips, Profit: ${config.CURRENCY_SYMBOL}${profitValue.toFixed(2)}\n`;
+  });
+
+  table += `\nTotal Potential Profit: ${config.CURRENCY_SYMBOL}${totalProfit.toFixed(2)}`;
 
   return table;
 }
@@ -275,17 +305,16 @@ async function placeTrade(connection, trade, chatId, messageId) {
 
   for (let i = 0; i < trade.takeProfits.length; i++) {
     let tp = trade.takeProfits[i];
+    const positionSize = trade.positionSizePerTP[i];
     const comment = `${trade.signalSource} TP${i + 1}`.substring(0, 31);
-    await sendMessage(chatId, `<pre>Placing trade: ${comment} for ${tp}</pre>`,
-        true);
+    await sendMessage(chatId, `<pre>Placing trade: ${comment} for TP${i + 1}</pre>`, true);
 
     // Ensure TP1 is always solid, subsequent TPs follow CLOSE_TRADE_ON_SL_ONLY
-    const tpValue = (i === 0 || !config.CLOSE_TRAILING_TRADE_ON_SL_ONLY) ? tp
-        : null;
+    const tpValue = (i === 0 || !config.CLOSE_TRAILING_TRADE_ON_SL_ONLY) ? tp : null;
 
     const orderOptions = {
       comment,
-      ...(i > 0 && {trailingStopLoss: trailingStopLoss})
+      ...(i > 0 && { trailingStopLoss: trailingStopLoss })
     };
 
     try {
@@ -293,11 +322,11 @@ async function placeTrade(connection, trade, chatId, messageId) {
       if (trade.orderType === 'Buy') {
         logger.info(messageId + ' calling createMarketBuyOrder ' + comment);
         tradeResponse = await connection.createMarketBuyOrder(trade.symbol,
-            trade.positionSizePerTP, trade.stopLoss, tpValue, orderOptions);
+            positionSize, trade.stopLoss, tpValue, orderOptions);
       } else {
         logger.info(messageId + ' calling createMarketSellOrder ' + comment);
         tradeResponse = await connection.createMarketSellOrder(trade.symbol,
-            trade.positionSizePerTP, trade.stopLoss, tpValue, orderOptions);
+            positionSize, trade.stopLoss, tpValue, orderOptions);
       }
       const position = await getPosition(connection, tradeResponse.positionId);
       // logger.info(`Trade saved to DynamoDB with TradeId: ${tradeId}`);
@@ -336,7 +365,7 @@ async function getPosition(connection, positionId) {
 async function fetchMT5Details(chatId) {
   let connection, account;
   try {
-    ({connection, account} = await getMetaTraderApiConnection(chatId));
+    ({ connection, account } = await getMetaTraderApiConnection(chatId));
     const accountInfo = await connection.getAccountInformation();
     const positions = await connection.getPositions();
     const orders = await connection.getOrders();
@@ -374,4 +403,4 @@ function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-module.exports = {handleMetaTraderTrade, fetchMT5Details, getMetaTraderMetrics};
+module.exports = { handleMetaTraderTrade, fetchMT5Details, getMetaTraderMetrics };

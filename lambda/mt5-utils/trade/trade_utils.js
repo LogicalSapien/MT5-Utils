@@ -162,4 +162,9 @@ function parseProvider2(lines) {
   return trade;
 }
 
+function getIsoDateStr(date) {
+  const dateInMillis = new Date(date * 1000); // Multiply by 1000 to convert seconds to milliseconds
+  return dateInMillis.toISOString();
+}
+
 module.exports = { parseTradeSignal, getIsoDateStr };
