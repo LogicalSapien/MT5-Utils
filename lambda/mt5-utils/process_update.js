@@ -13,7 +13,7 @@ const {
 } = require('./handle_message');
 const logger = require('./logger');
 const config = require("./config");
-const {sendMessage} = require("./telegram/telegram_utils");
+const { sendMessage } = require("./telegram/telegram_utils");
 
 async function processUpdate(body) {
   try {
@@ -27,7 +27,7 @@ async function processUpdate(body) {
         const chatId = message.chat.id;
         if (username !== config.AUTHORIZED_TELEGRAM_USER) {
           await sendMessage(chatId, "You are not authorized to use this bot!");
-        }else if (message.text === '/start') {
+        } else if (message.text === '/start') {
           await handleStart(message);
         } else if (message.text === '/help') {
           await handleHelp(message);
@@ -62,4 +62,4 @@ async function processUpdate(body) {
   }
 }
 
-module.exports = {processUpdate};
+module.exports = { processUpdate };

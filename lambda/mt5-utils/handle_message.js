@@ -1,6 +1,6 @@
 const { saveChatMessageIfNotDuplicate, getLastMessages, markTradeExecuted } = require('./db/dynamo_db');
-const { parseTradeSignal, getIsoDateStr} = require('./trade/trade_utils');
-const { handleMetaTraderTrade, fetchMT5Details, getMetaTraderMetrics} = require('./trade/mt5_utils');
+const { parseTradeSignal, getIsoDateStr } = require('./trade/trade_utils');
+const { handleMetaTraderTrade, fetchMT5Details, getMetaTraderMetrics } = require('./trade/mt5_utils');
 const { sendMessage } = require('./telegram/telegram_utils');
 const logger = require('./logger');
 const config = require('./config');
@@ -34,7 +34,7 @@ async function handleMessage(message) {
       const lastState = determineLastState(previousMessage);
 
       if (!lastState) {
-        await handleNewSignal(chatId, text, message.date);
+        await handleNewSignal(chatId, text, message.date, message.message_id);
       } else {
         await processLastState(lastState, text, chatId, lastMessages, message.message_id, message.date);
       }
@@ -60,13 +60,16 @@ function determineLastState(message) {
   }
 }
 
-async function handleNewSignal(chatId, text, signalDate) {
+async function handleNewSignal(chatId, text, signalDate, messageId) {
   const trade = parseTradeSignal(text, getIsoDateStr(signalDate));
   if (!trade) {
     await sendMessage(chatId, "Invalid trade format. Please use the correct format.");
     return;
   }
-  await sendMessage(chatId, "Do you want to trade this signal or calculate it? Use /tradelast to trade or /calculatelast to calculate.");
+  // Automatically perform the calculation
+  await handleMetaTraderTrade(chatId, trade, false, messageId);
+  // Provide the /tradelast option
+  await sendMessage(chatId, "Do you want to trade this signal? Use /tradelast to confirm.");
 }
 
 async function processLastState(lastState, text, chatId, lastMessages, messageId, signalDate) {
@@ -81,7 +84,7 @@ async function processLastState(lastState, text, chatId, lastMessages, messageId
       await handleCalculateLastFromMessages(lastMessages, chatId);
       break;
     default:
-      await handleNewSignal(chatId, text, signalDate);
+      await handleNewSignal(chatId, text, signalDate, messageId);
       break;
   }
 }
@@ -152,7 +155,11 @@ async function handleTradeLast(message) {
     await saveChatMessageIfNotDuplicate(message);
     const lastMessages = await getLastMessages(username);
     const lastTradeSignal = lastMessages.find(
-        (msg) => msg.message.includes('BUY') || msg.message.includes('SELL')  || msg.message.includes('Long')  || msg.message.includes('Short')
+        (msg) =>
+            msg.message.includes('BUY') ||
+            msg.message.includes('SELL') ||
+            msg.message.includes('Long') ||
+            msg.message.includes('Short')
     );
 
     if (lastTradeSignal) {
