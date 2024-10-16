@@ -100,9 +100,16 @@ async function handleNewSignal(chatId, text, signalDate, messageId) {
     return;
   }
   // Automatically perform the calculation
-  await handleMetaTraderTrade(chatId, trade, false, messageId);
-  // Provide the /tradelast option
-  await sendMessage(chatId, "Do you want to trade this signal? Use /tradelast to confirm.");
+  const updatedTrade = await handleMetaTraderTrade(chatId, trade, false, messageId);
+  if (updatedTrade && updatedTrade.totalProfit > updatedTrade.potentialTotalLoss) {
+    // Automatically execute the trade if profit is greater than loss
+    await handleMetaTraderTrade(chatId, updatedTrade, true, messageId);
+    await markTradeExecuted(messageId);
+    await sendMessage(chatId, "Trade executed automatically as the potential profit is greater than the potential loss.");
+  } else {
+    // Provide the /tradelast option
+    await sendMessage(chatId, "Do you want to trade this signal? Use /tradelast to confirm.");
+  }
 }
 
 async function processLastState(lastState, text, chatId, lastMessages, messageId, signalDate) {
@@ -135,8 +142,13 @@ async function executeTrade(text, chatId, messageId, signalDate) {
 async function calculateTrade(text, chatId, signalDate, messageId) {
   const calculation = parseTradeSignal(text, getIsoDateStr(signalDate));
   if (calculation) {
-    await handleMetaTraderTrade(chatId, calculation, false, messageId);
-    await sendMessage(chatId, "Do you want to trade this signal? Use /tradelast to confirm.");
+    const updatedTrade = await handleMetaTraderTrade(chatId, calculation, false, messageId);
+    // Only calculate without executing the trade
+    if (updatedTrade) {
+      await sendMessage(chatId, "Calculation completed. Potential profit and loss have been calculated.");
+    } else {
+      await sendMessage(chatId, "Invalid trade format. Please use the correct format.");
+    }
   } else {
     await sendMessage(chatId, "Invalid trade format. Please use the correct format.");
   }
@@ -240,8 +252,13 @@ async function handleCalculateLastFromMessages(lastMessages, chatId) {
   if (lastTradeSignal) {
     const calculation = parseTradeSignal(lastTradeSignal.message, lastTradeSignal.date);
     if (calculation) {
-      await handleMetaTraderTrade(chatId, calculation, false, lastTradeSignal.messageId);
-      await sendMessage(chatId, "Do you want to trade this signal? Use /tradelast to confirm.");
+      const updatedTrade = await handleMetaTraderTrade(chatId, calculation, false, lastTradeSignal.messageId);
+      // Only calculate without executing the trade
+      if (updatedTrade) {
+        await sendMessage(chatId, "Calculation completed. Potential profit and loss have been calculated.");
+      } else {
+        await sendMessage(chatId, "Invalid trade format in the last signal.");
+      }
     } else {
       await sendMessage(chatId, "Invalid trade format in the last signal.");
     }

@@ -282,6 +282,8 @@ Position Sizes and Potential Loss per TP:
 
   table += `\nTotal Potential Profit: ${config.CURRENCY_SYMBOL}${totalProfit.toFixed(2)}`;
 
+  trade.totalProfit = totalProfit.toFixed(2);
+
   return table;
 }
 
