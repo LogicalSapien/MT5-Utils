@@ -1,6 +1,5 @@
 const { saveChatMessageIfNotDuplicate, getLastMessages, markTradeExecuted } = require('./db/dynamo_db');
 const { parseTradeSignal, getIsoDateStr } = require('./trade/trade_utils');
-const { handleMetaTraderTrade, fetchMT5Details, getMetaTraderMetrics } = require('./trade/mt5_utils');
 const { handleMt5TraderTrade } = require('./trade/mt5_terminal');
 const { sendMessage } = require('./telegram/telegram_utils');
 const logger = require('./logger');
@@ -314,8 +313,7 @@ async function handleFetchMT5Details(message) {
   try {
     await saveChatMessageIfNotDuplicate(message);
     // Fetch MetaTrader account details
-    const detailsMessage = await fetchMT5Details(chatId);
-    await sendMessage(chatId, `<pre>${detailsMessage}</pre>`, true);
+    await sendMessage(chatId, `<pre>Not Confiured</pre>`, true);
   } catch (error) {
     logger.error('Error fetching MetaTrader account details:', error);
     await sendMessage(message.chat.id, `<pre>"An error occurred. "${error}</pre>`, true);
@@ -328,8 +326,7 @@ async function handleFetchAccountMetrics(message, type) {
   try {
     await saveChatMessageIfNotDuplicate(message);
     // Fetch MetaTrader account details
-    const accountMetrics = await getMetaTraderMetrics(chatId, type);
-    await sendMessage(chatId, `<pre>${accountMetrics}</pre>`, true);
+    await sendMessage(chatId, `<pre>Not Configured</pre>`, true);
   } catch (error) {
     logger.error('Error fetching MetaTrader account metrics:', error);
     await sendMessage(message.chat.id, `<pre>"An error occurred. "${error}</pre>`, true);
