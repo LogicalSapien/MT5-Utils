@@ -54,6 +54,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      # Ensure to create a bucket for lambda
+      - name: Upload Lambda packages to S3
+        run: |
+          aws s3 cp lambda/mt5-utils/mt5-utils-lambda.zip s3://mt5-utils-lambdas/mt5-utils-lambda.zip
+
       - name: Terraform Init
         run: terraform init
         working-directory: terraform
