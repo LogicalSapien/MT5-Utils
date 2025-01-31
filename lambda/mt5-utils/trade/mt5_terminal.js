@@ -527,7 +527,8 @@ async function launchBrowser() {
     if (process.env.AWS_EXECUTION_ENV) {
         return await playwrightAwsLambda.launchChromium({ headless: true });
     } else {
-        return await chromium.launch({ headless: true });
+        // return await chromium.launch({ headless: true });
+        return await playwrightAwsLambda.launchChromium({ headless: true });
     }
 }
 
