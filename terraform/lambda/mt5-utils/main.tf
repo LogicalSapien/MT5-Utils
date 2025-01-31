@@ -3,7 +3,7 @@ resource "aws_lambda_function" "mt5_utils_lambda" {
   s3_bucket                      = "mt5-utils-lambdas"
   s3_key                         = "mt5-utils-lambda.zip"
   handler                        = "index.handler"
-  runtime                        = "nodejs20.x"
+  runtime                        = "nodejs18.x"
   role                           = var.lambda_role_arn
   timeout                        = 600
   memory_size                    = 512
