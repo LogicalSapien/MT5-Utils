@@ -529,10 +529,11 @@ async function launchBrowser() {
     if (process.env.AWS_EXECUTION_ENV) {
         // return await playwrightAwsLambda.launchChromium({ headless: true });
         logger.info('Launching AWS Lambda Chromium...');
+
         const browser = await playwright.launch({
             args: chromium.args,
             executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
+            headless: true,
           });
         // return await playwright.chromium.launch({
         //     args: chromium.args,
@@ -542,8 +543,7 @@ async function launchBrowser() {
         return browser
     } else {
         logger.info('Launching Local Chromium...');
-        // todo - Enable to run locally
-        // return await chromium.launch({ headless: true });
+        return await chromium.launch({ headless: true });
     }
 }
 
