@@ -1,73 +1,74 @@
 import asyncio
 import logging
 import smtplib
+import os
+from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from telethon import TelegramClient, events
-from telethon.tl.types import PeerChat
 from telethon.errors.rpcerrorlist import PeerIdInvalidError, ChatWriteForbiddenError
+
+# ✅ Load environment variables from .envrc
+load_dotenv(".env")
 
 # ✅ Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-API_ID = "***"
-API_HASH = "***"
-SESSION_NAME = "telegram_forwarder"
+# ✅ Load credentials from .envrc
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+SESSION_NAME = os.getenv("SESSION_NAME", "telegram_forwarder")
+BOT_NAME = os.getenv("BOT_NAME")
+GROUP_NAME = os.getenv("GROUP_NAME")
+EXECUTE_TRADE = os.getenv("EXECUTE_TRADE", "False").lower() == "true"
 
-SOURCE_GROUP = PeerChat(00000)  # Group where signals are received
-TARGET_BOT_NAME = "*****"  # Bot username (if registered as a bot)
-TARGET_USER_ID = 0000  # Fallback user ID
+# ✅ Email Config (Used for notifications if bot crashes, but email sending is disabled by default)
+SMTP_SERVER = os.getenv("SMTP_SERVER")
+SMTP_PORT = os.getenv("SMTP_PORT", "587")
+EMAIL_SENDER = os.getenv("EMAIL_SENDER")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER")
 
-# ✅ Email Config (Send email if bot logs out)
-# SMTP_SERVER = "smtp.gmail.com"
-# SMTP_PORT = 587
-# EMAIL_SENDER = "your-email@gmail.com"
-# EMAIL_PASSWORD = "your-email-password"
-# EMAIL_RECEIVER = "your-email@gmail.com"
-
-
-# async def send_email(subject, message):
-#     """ Sends an email notification. """
-#     try:
-#         msg = MIMEText(message)
-#         msg["Subject"] = subject
-#         msg["From"] = EMAIL_SENDER
-#         msg["To"] = EMAIL_RECEIVER
-
-#         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-#         server.starttls()
-#         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-#         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
-#         server.quit()
-#         logging.info("📧 Email notification sent.")
-#     except Exception as e:
-#         logging.error(f"❌ Failed to send email: {e}")
-
-
-async def detect_bot(client):
-    """ Detects whether the target is a bot or a user and returns correct identifier. """
+async def send_email(subject, message):
+    """ Sends an email notification (Disabled by default). """
     try:
-        entity = await client.get_entity(TARGET_BOT_NAME)
-        if getattr(entity, "bot", False):
-            logging.info(f"✅ {TARGET_BOT_NAME} is a bot. Using username for forwarding.")
-            return TARGET_BOT_NAME  # Use bot username if it's a bot
-        else:
-            logging.warning(f"⚠️ {TARGET_BOT_NAME} is NOT a bot. Using fallback user ID: {TARGET_USER_ID}")
-            return TARGET_USER_ID  # Use user ID if not a bot
+        msg = MIMEText(message)
+        msg["Subject"] = subject
+        msg["From"] = EMAIL_SENDER
+        msg["To"] = EMAIL_RECEIVER
+
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
+        server.quit()
+        logging.info("📧 Email notification sent.")
     except Exception as e:
-        logging.error(f"❌ Failed to detect bot: {e}. Using fallback user ID: {TARGET_USER_ID}")
-        return TARGET_USER_ID  # Default to user ID
+        logging.error(f"❌ Failed to send email: {e}")
 
 
-async def forward_message(client, message_text):
-    """ Forwards a message to the bot/user. """
-    try:
-        recipient = await detect_bot(client)
-        logging.info(f"📤 Forwarding message to {recipient}...")
-        await client.send_message(recipient, message_text)
-        logging.info("✅ Message forwarded successfully!")
-    except Exception as e:
-        logging.error(f"❌ Failed to forward message: {e}")
-        # await send_email("Telegram Bot Alert", f"Failed to forward message: {e}")
+async def get_ids(client):
+    """ Fetches the IDs of the bot and group based on their names. """
+    logging.info("🔍 Fetching bot and group IDs...")
+    
+    dialogs = await client.get_dialogs()
+    bot_id, group_id = None, None
+
+    for dialog in dialogs:
+        print(f"Chat Name: {dialog.name} | ID: {dialog.id}")
+        if dialog.name.strip() == BOT_NAME.strip():
+            bot_id = dialog.id
+            logging.info(f"✅ Bot '{BOT_NAME}' found with ID: {bot_id}")
+
+        if dialog.name.strip() == GROUP_NAME.strip():
+            group_id = dialog.id
+            logging.info(f"✅ Group '{GROUP_NAME}' found with ID: {group_id}")
+
+    if bot_id is None or group_id is None:
+        logging.error("❌ Could not find bot or group. Check the names in .envrc!")
+        exit(1)
+
+    return bot_id, group_id
+
 
 async def main():
     """ Main function to monitor Telegram group and forward messages. """
@@ -75,20 +76,34 @@ async def main():
         me = await client.get_me()
         logging.info(f"✅ Logged in as {me.username}")
 
-        dialogs = await client.get_dialogs()
-        for dialog in dialogs:
-            print(f"Chat Name: {dialog.name} | ID: {dialog.id}")
+        # ✅ Get bot and group IDs dynamically
+        bot_id, group_id = await get_ids(client)
 
-        @client.on(events.NewMessage(chats=SOURCE_GROUP))
-        async def handler(event):
+        @client.on(events.NewMessage(chats=group_id))
+        async def group_handler(event):
+            """ Handles messages received in the target group. """
             message_text = event.raw_text
-            logging.info(f"📥 New message received: {message_text}")
+            # logging.info(f"📥 New group message received: {message_text}")
 
             if "Open Price" in message_text:
                 logging.info("🔎 Matching keyword found! Forwarding...")
-                await forward_message(client, message_text)
+                await client.send_message(bot_id, message_text)
 
-        logging.info(f"🚀 Listening for messages in '{SOURCE_GROUP}'...")
+        @client.on(events.NewMessage(chats=bot_id))
+        async def bot_handler(event):
+            """ Handles messages received by the bot. """
+            message_text = event.raw_text
+            # logging.info(f"🤖 Bot received a message: {message_text}")
+
+            # ✅ Respond to /tradelast if execute flag is enabled
+            if "/tradelast" in message_text.strip():
+                if EXECUTE_TRADE:
+                    logging.info("⚡ Executing trade command: /tradelast")
+                    await client.send_message(bot_id, "/tradelast")
+                else:
+                    logging.info("❌ Trade execution is disabled")
+
+        logging.info(f"🚀 Listening for messages in '{GROUP_NAME}' and bot '{BOT_NAME}'...")
         await client.run_until_disconnected()
 
 
@@ -97,4 +112,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except Exception as e:
         logging.critical(f"🚨 Bot logged out or crashed: {e}")
+        # Uncomment to enable email alerts:
         # asyncio.run(send_email("Telegram Bot Logged Out", f"Error: {e}"))

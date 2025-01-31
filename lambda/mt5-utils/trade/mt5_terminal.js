@@ -537,7 +537,7 @@ async function launchBrowser() {
         return browser
     } else {
         logger.info('Launching Local Chromium...');
-        return await chromium.launch({ headless: true });
+        return await chromium.launch({ headless: false });
     }
 }
 
