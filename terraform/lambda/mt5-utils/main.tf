@@ -1,14 +1,13 @@
 resource "aws_lambda_function" "mt5_utils_lambda" {
   function_name                  = "mt5-utils-lambda"
-  filename                       = "../lambda/mt5-utils/mt5-utils-lambda.zip"
+  s3_bucket                      = "mt5-utils-lambdas"
+  s3_key                         = "mt5-utils-lambda.zip"
   handler                        = "index.handler"
   runtime                        = "nodejs20.x"
   role                           = var.lambda_role_arn
   timeout                        = 600
-  memory_size                    = 256
+  memory_size                    = 512
   reserved_concurrent_executions = 1
-
-  source_code_hash = filebase64sha256("../lambda/mt5-utils/mt5-utils-lambda.zip")
 
   environment {
     variables = local.merged_variables
