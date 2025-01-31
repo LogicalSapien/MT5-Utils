@@ -99,6 +99,24 @@ async function handleNewSignal(chatId, text, signalDate, messageId) {
     await sendMessage(chatId, PLACE_TRADE_MESSAGE);
     return;
   }
+
+  // ✅ Check if "/tradethis" is in the message
+  if (text.includes("/tradethis")) {
+    logger.info("⚡ Trade execution triggered by '/tradethis'");
+    
+    // ✅ Execute trade immediately
+    const executedTrade = await handleMt5TraderTrade(chatId, trade, true, messageId);
+    
+    if (executedTrade) {
+      await markTradeExecuted(messageId);
+      await sendMessage(chatId, "✅ Trade executed successfully.");
+    } else {
+      await sendMessage(chatId, "❌ Trade execution failed.");
+    }
+
+    return; // ✅ Do not proceed further (Skip sending /tradelast option)
+  }
+
   // Automatically perform the calculation
   // const updatedTrade = await handleMetaTraderTrade(chatId, trade, false, messageId);
   // switching to new

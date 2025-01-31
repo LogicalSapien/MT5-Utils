@@ -87,21 +87,14 @@ async def main():
 
             if "Open Price" in message_text:
                 logging.info("🔎 Matching keyword found! Forwarding...")
-                await client.send_message(bot_id, message_text)
 
-        @client.on(events.NewMessage(chats=bot_id))
-        async def bot_handler(event):
-            """ Handles messages received by the bot. """
-            message_text = event.raw_text
-            # logging.info(f"🤖 Bot received a message: {message_text}")
-
-            # ✅ Respond to /tradelast if execute flag is enabled
-            if "/tradelast" in message_text.strip():
-                if EXECUTE_TRADE:
-                    logging.info("⚡ Executing trade command: /tradelast")
-                    await client.send_message(bot_id, "/tradelast")
+                if EXECUTE_TRADE:                    
+                    logging.info("⚡ Adding /tradethis ")
+                    modified_message = f"{message_text} \n\n/tradethis"
+                    await client.send_message(bot_id, modified_message)
                 else:
-                    logging.info("❌ Trade execution is disabled")
+                    await client.send_message(bot_id, message_text)
+                
 
         logging.info(f"🚀 Listening for messages in '{GROUP_NAME}' and bot '{BOT_NAME}'...")
         await client.run_until_disconnected()
