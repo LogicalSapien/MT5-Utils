@@ -527,7 +527,6 @@ async function executeTradeOrders(page, trade, chatId, messageId) {
  */
 async function launchBrowser() {
     if (process.env.AWS_EXECUTION_ENV) {
-        // return await playwrightAwsLambda.launchChromium({ headless: true });
         logger.info('Launching AWS Lambda Chromium...');
 
         const browser = await playwright.launch({
@@ -535,11 +534,6 @@ async function launchBrowser() {
             executablePath: await chromium.executablePath(),
             headless: true,
           });
-        // return await playwright.chromium.launch({
-        //     args: chromium.args,
-        //     executablePath: await chromium.executablePath(),
-        //     headless: true
-        // });
         return browser
     } else {
         logger.info('Launching Local Chromium...');
