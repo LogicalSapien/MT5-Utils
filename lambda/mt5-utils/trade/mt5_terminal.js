@@ -1,5 +1,5 @@
-const { chromium } = require('playwright'); // or use the full Playwright if running locally
-// const playwrightAwsLambda = require('playwright-aws-lambda');
+// todo - Enable to run locally - use the full Playwright if running locally
+// const { chromium } = require('playwright'); 
 const { chromium: playwright } = require("playwright-core"); // Use playwright-core, not full Playwright
 const chromium = require('@sparticuz/chromium'); // AWS Lambda-compatible Chromium
 const logger = require("../logger");
@@ -542,8 +542,8 @@ async function launchBrowser() {
         return browser
     } else {
         logger.info('Launching Local Chromium...');
-        return await chromium.launch({ headless: true });
-        // return await playwrightAwsLambda.launchChromium({ headless: true });
+        // todo - Enable to run locally
+        // return await chromium.launch({ headless: true });
     }
 }
 
