@@ -1,5 +1,7 @@
 const { chromium } = require('playwright'); // or use the full Playwright if running locally
-const playwrightAwsLambda = require('playwright-aws-lambda');
+// const playwrightAwsLambda = require('playwright-aws-lambda');
+const playwright = require('playwright-core'); // Use playwright-core, not full Playwright
+const chromium = require('@sparticuz/chromium'); // AWS Lambda-compatible Chromium
 const logger = require("../logger");
 const config = require('../config');
 const { sendMessage } = require('../telegram/telegram_utils');
@@ -525,10 +527,17 @@ async function executeTradeOrders(page, trade, chatId, messageId) {
  */
 async function launchBrowser() {
     if (process.env.AWS_EXECUTION_ENV) {
-        return await playwrightAwsLambda.launchChromium({ headless: true });
+        // return await playwrightAwsLambda.launchChromium({ headless: true });
+        console.log("Launching AWS Lambda Chromium...");
+        return await playwright.chromium.launch({
+            args: chromium.args,
+            executablePath: await chromium.executablePath(),
+            headless: true
+        });
     } else {
-        // return await chromium.launch({ headless: true });
-        return await playwrightAwsLambda.launchChromium({ headless: true });
+        console.log("Launching Local Chromium...");
+        return await chromium.launch({ headless: true });
+        // return await playwrightAwsLambda.launchChromium({ headless: true });
     }
 }
 
