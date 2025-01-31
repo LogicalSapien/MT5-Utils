@@ -6,7 +6,7 @@ resource "aws_lambda_function" "mt5_utils_lambda" {
   runtime                        = "nodejs18.x"
   role                           = var.lambda_role_arn
   timeout                        = 600
-  memory_size                    = 2014
+  memory_size                    = 1024
   reserved_concurrent_executions = 1
 
   environment {
