@@ -28,7 +28,7 @@ jobs:
 
       - name: Install MT5-Utils dependencies
         working-directory: lambda/mt5-utils
-        run: npm ci
+        run: npm ci --omit=dev
 
       - name: Create MT5-Utils Lambda deployment package
         working-directory: lambda/mt5-utils
