@@ -1,6 +1,7 @@
 const { saveChatMessageIfNotDuplicate, getLastMessages, markTradeExecuted } = require('./db/dynamo_db');
 const { parseTradeSignal, getIsoDateStr } = require('./trade/trade_utils');
 const { handleMetaTraderTrade, fetchMT5Details, getMetaTraderMetrics } = require('./trade/mt5_utils');
+const { handleMt5TraderTrade } = require('./trade/mt5_terminal');
 const { sendMessage } = require('./telegram/telegram_utils');
 const logger = require('./logger');
 const config = require('./config');
@@ -100,10 +101,15 @@ async function handleNewSignal(chatId, text, signalDate, messageId) {
     return;
   }
   // Automatically perform the calculation
-  const updatedTrade = await handleMetaTraderTrade(chatId, trade, false, messageId);
+  // const updatedTrade = await handleMetaTraderTrade(chatId, trade, false, messageId);
+  // switching to new
+  const updatedTrade = await handleMt5TraderTrade(chatId, trade, false, messageId);
+  
   if (updatedTrade && updatedTrade.totalProfit > updatedTrade.potentialTotalLoss) {
     // Automatically execute the trade if profit is greater than loss
-    await handleMetaTraderTrade(chatId, updatedTrade, true, messageId);
+    // await handleMetaTraderTrade(chatId, updatedTrade, true, messageId);
+    // switching to new
+    await handleMt5TraderTrade(chatId, updatedTrade, true, messageId);
     await markTradeExecuted(messageId);
     await sendMessage(chatId, "Trade executed automatically as the potential profit is greater than the potential loss.");
   } else {
@@ -132,7 +138,9 @@ async function processLastState(lastState, text, chatId, lastMessages, messageId
 async function executeTrade(text, chatId, messageId, signalDate) {
   const trade = parseTradeSignal(text, getIsoDateStr(signalDate));
   if (trade) {
-    await handleMetaTraderTrade(chatId, trade, true, messageId);
+    // await handleMetaTraderTrade(chatId, trade, true, messageId);
+    // switching to new
+    await handleMt5TraderTrade(chatId, trade, true, messageId);    
     await markTradeExecuted(messageId);
   } else {
     await sendMessage(chatId, "Invalid trade format. Please use the correct format.");
@@ -142,7 +150,9 @@ async function executeTrade(text, chatId, messageId, signalDate) {
 async function calculateTrade(text, chatId, signalDate, messageId) {
   const calculation = parseTradeSignal(text, getIsoDateStr(signalDate));
   if (calculation) {
-    const updatedTrade = await handleMetaTraderTrade(chatId, calculation, false, messageId);
+    // const updatedTrade = await handleMetaTraderTrade(chatId, calculation, false, messageId);
+    // switching to new
+    const updatedTrade = await handleMt5TraderTrade(chatId, calculation, false, messageId);    
     // Only calculate without executing the trade
     if (updatedTrade) {
       await sendMessage(chatId, "Calculation completed. Potential profit and loss have been calculated.");
@@ -213,7 +223,9 @@ async function handleTradeLast(message) {
       } else {
         const trade = parseTradeSignal(lastTradeSignal.message, lastTradeSignal.date);
         if (trade) {
-          await handleMetaTraderTrade(message.chat.id, trade, true, lastTradeSignal.messageId);
+          // await handleMetaTraderTrade(message.chat.id, trade, true, lastTradeSignal.messageId);
+          // switching to new
+          await handleMt5TraderTrade(message.chat.id, trade, true, lastTradeSignal.messageId);          
           await markTradeExecuted(lastTradeSignal.messageId);
         } else {
           await sendMessage(message.chat.id, "Invalid trade format in the last signal.");
@@ -252,7 +264,9 @@ async function handleCalculateLastFromMessages(lastMessages, chatId) {
   if (lastTradeSignal) {
     const calculation = parseTradeSignal(lastTradeSignal.message, lastTradeSignal.date);
     if (calculation) {
-      const updatedTrade = await handleMetaTraderTrade(chatId, calculation, false, lastTradeSignal.messageId);
+      // const updatedTrade = await handleMetaTraderTrade(chatId, calculation, false, lastTradeSignal.messageId);
+      // switching to new
+      const updatedTrade = await handleMt5TraderTrade(chatId, calculation, false, lastTradeSignal.messageId);      
       // Only calculate without executing the trade
       if (updatedTrade) {
         await sendMessage(chatId, "Calculation completed. Potential profit and loss have been calculated.");

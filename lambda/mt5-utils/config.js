@@ -1,5 +1,9 @@
 // config.js
 module.exports = {
+  MT5_USER: process.env.MT5_USER || '',
+  MT5_PASSWORD: process.env.MT5_PASSWORD || '',
+  CONTRACT_SIZE: process.env.CONTRACT_SIZE || 10000, // e.g., 1 lot = 100k units
+  LEVERAGE: process.env.LEVERAGE || 30,            // e.g., 1:30 leverage
   META_API_KEY: process.env.META_API_KEY || '',
   META_ACCOUNT_ID: process.env.META_ACCOUNT_ID || '',
   RISK_FACTOR: process.env.RISK_FACTOR || '',
