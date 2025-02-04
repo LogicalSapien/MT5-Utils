@@ -72,9 +72,15 @@ async function handleMessage(message) {
       }
     }
   } catch (error) {
-    logger.error('Error handling message:', error);
-    await sendMessage(message.chat.id, `<pre>"An error occurred. "${error}</pre>`, true);
-  }
+    if (error.includes("Duplicate")) {
+        logger.warn(`⚠️ Skipping duplicate message: ${error}`);
+        await sendMessage(message.chat.id, `<pre>${error}</pre>`, true);
+    } else {
+        logger.error('❌ Error handling message:', error);
+        await sendMessage(message.chat.id, `<pre>An error occurred. ${error}</pre>`, true);
+    }
+}
+
 }
 
 function determineLastState(message) {
