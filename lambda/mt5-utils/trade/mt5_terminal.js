@@ -256,7 +256,7 @@ async function handleMt5TraderTrade(chatId, trade, executeTrade, messageId) {
     let browser, context, page;
     
     try {
-        await sendMessage(chatId, "Processing...");
+        await sendMessage(chatId, "Launching browser and logging into MT5...");
         logger.info('Launching browser and logging into MT5...');
         browser = await launchBrowser();
         context = await browser.newContext();
@@ -264,6 +264,7 @@ async function handleMt5TraderTrade(chatId, trade, executeTrade, messageId) {
         await loginToMT5(page);
 
         // Get account balance & margin
+        await sendMessage(chatId, "Fetching account balance and margin...");
         logger.info('Fetching account balance and margin...');
         const { balance, equity, margin, freeMargin } = await getAccountBalanceAndMargin(page);
         trade.balance = balance;
@@ -271,6 +272,7 @@ async function handleMt5TraderTrade(chatId, trade, executeTrade, messageId) {
         trade.margin = margin;
         trade.freeMargin = freeMargin;
         logger.info(`💰 Balance: ${balance}, Equity: ${equity}, Margin: ${margin}, Free margin: ${freeMargin}`);
+        await sendMessage(chatId, `💰 Balance: ${balance}, Equity: ${equity}, Margin: ${margin}, Free margin: ${freeMargin}`);
 
         // Select symbol & fetch bid/ask prices
         trade.symbol += config.TRADE_SYMBOL_SUFFIX;
@@ -279,6 +281,7 @@ async function handleMt5TraderTrade(chatId, trade, executeTrade, messageId) {
         const prices = await openOrderWindowAndGetPrices(page);
         trade.currentEntry = trade.orderType === 'Buy' ? prices.buyPrice : prices.sellPrice;
         logger.info(`💲 Current Entry Price: ${trade.currentEntry}`);
+        await sendMessage(chatId, `💲 Current Entry Price: ${trade.currentEntry}`);        
 
         // Calculate trade parameters based on real-time balance & margin
         logger.info('Calling calculateTradeParameters...');
@@ -296,6 +299,7 @@ async function handleMt5TraderTrade(chatId, trade, executeTrade, messageId) {
             if (config.ENABLE_TRADE_EXECUTION) {
                 logger.info('Executing trade...');
                 await executeTradeOrders(page, updatedTrade, chatId, messageId);
+                return trade;
             } else {
                 await sendMessage(chatId, "Trade execution is currently disabled. No trades have been placed.");
             }
@@ -308,7 +312,7 @@ async function handleMt5TraderTrade(chatId, trade, executeTrade, messageId) {
         if (browser) {
             await browser.close();
         }
-    }
+    }    
 }
 
 async function calculateTradeParameters(trade, price, balance) {  

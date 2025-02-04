@@ -54,7 +54,7 @@ async def get_ids(client):
     bot_id, group_id = None, None
 
     for dialog in dialogs:
-        print(f"Chat Name: {dialog.name} | ID: {dialog.id}")
+        logging.info(f"Chat Name: {dialog.name} | ID: {dialog.id}")
         if dialog.name.strip() == BOT_NAME.strip():
             bot_id = dialog.id
             logging.info(f"✅ Bot '{BOT_NAME}' found with ID: {bot_id}")
